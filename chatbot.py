@@ -1,8 +1,9 @@
 import json
+import re
 
 def gather_input():
 	# pass the absolute path of file or just the name if in same directory
-	path = take_input("Please provide the path of input file : ")
+	path = take_input("Please provide the path of input file")
 
 	with open(path, 'r') as file_data:
 		input_data = json.loads(file_data.read())
@@ -13,18 +14,25 @@ def gather_input():
 def sample_text_function(question_matrix):
 	''' loop through the input instruction '''
 	# capture access to locals
-	localVar = locals()
+	localVar = {}
 
 	for d in question_matrix:
 		if d.get('instruction'):
-			unpack_instrcution(d)
+			unpack_instrcution(d, localVar)
 		elif d.get("text"):
-			localVar[d["var"]] = get_var_input(d, localVar)
+			list_instance = re.findall('.*(\[.*?\]).*', d["var"])
+			if list_instance:
+				temp_var = get_var_input(d, localVar)
+				list_eval = "{0}.append('{1}')".format(d["var"].split("[")[0], temp_var)
+				eval(list_eval, localVar)
+			else:
+				localVar[d["var"]] = get_var_input(d, localVar)
+		elif d.get("calculated_variable"):
+			localVar[d["var"]] = calculated_variable(d, localVar)
 
 def get_var_input(data, localVar):
 	''' store '''
-	if not localVar.get(data["var"]):
-		localVar[data["var"]] = None
+	var = data["var"]
 
 	if data.get("conditions"):
 		conditions = data.get("conditions")
@@ -32,15 +40,32 @@ def get_var_input(data, localVar):
 		cond = " or ".join(and_cond)
 
 		while eval(cond, localVar):
-			localVar[data["var"]] = take_input(data["text"], data.get("options"))
+			localVar[var] = take_input(data["text"], data.get("options"))
 	else:
 		# take input
-		localVar[data["var"]] = take_input(data["text"], data.get("options"))
+		temp_var = take_input(data["text"], data.get("options"))
 
-	return localVar[data["var"]]
+	return localVar.get(var) or temp_var
 
-def unpack_instrcution(data):
-	print(data["instruction"])
+def unpack_instrcution(data, localVar):
+	output = data["instruction"]
+
+	if data.get("list_var") and data.get("list_length"):
+		for i in range(0, int(data["list_length"])):
+			localVar["i"] = i
+			args = [eval(x, localVar) for x in data["instruction_var"]]
+			output = data["instruction"] % tuple(args)
+			print(output)
+
+		return
+	elif data.get("instruction_var"):
+		args = [localVar[d] for d in data["instruction_var"]]
+		output = output % tuple(args)
+
+	print(output)
+
+def calculated_variable(d, localVar):
+	return eval(d["formula"], localVar)
 
 def scrub(txt):
 	''' return scrubbed name "XYZ-abc def" becomes "xyz_abc_def" '''

@@ -66,7 +66,7 @@
         },
         {
             "calculated_variable":"True",
-            "formula":"[map(int, i.split()) for i in row]",
+            "formula":"[map(int, i.split()) for i in rows]",
             "var":"matrix"
         },
         {
